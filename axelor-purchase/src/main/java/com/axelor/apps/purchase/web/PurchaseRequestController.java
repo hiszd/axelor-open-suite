@@ -20,12 +20,9 @@ package com.axelor.apps.purchase.web;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseRequest;
 import com.axelor.apps.purchase.db.repo.PurchaseRequestRepository;
-import com.axelor.apps.purchase.exception.IExceptionMessage;
 import com.axelor.apps.purchase.service.PurchaseRequestService;
 import com.axelor.apps.tool.StringTool;
 import com.axelor.exception.AxelorException;
-import com.axelor.exception.db.repo.TraceBackRepository;
-import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.meta.schema.actions.ActionView.ActionViewBuilder;
@@ -68,10 +65,6 @@ public class PurchaseRequestController {
     @SuppressWarnings("unchecked")
     List<Long> requestIds = (List<Long>) request.getContext().get("_ids");
     if (requestIds != null && !requestIds.isEmpty()) {
-      Boolean groupBySupplier = (Boolean) request.getContext().get("groupBySupplier");
-      groupBySupplier = groupBySupplier == null ? false : groupBySupplier;
-      Boolean groupByProduct = (Boolean) request.getContext().get("groupByProduct");
-      groupByProduct = groupByProduct == null ? false : groupByProduct;
       try {
         List<PurchaseRequest> purchaseRequests =
             Beans.get(PurchaseRequestRepository.class)
@@ -80,19 +73,17 @@ public class PurchaseRequestController {
                 .fetch();
         List<String> purchaseRequestSeqs =
             purchaseRequests.stream()
-                .filter(pr -> pr.getSupplierUser() == null)
                 .map(PurchaseRequest::getPurchaseRequestSeq)
                 .collect(Collectors.toList());
-        if (purchaseRequestSeqs != null && !purchaseRequestSeqs.isEmpty()) {
+        /*if (purchaseRequestSeqs != null && !purchaseRequestSeqs.isEmpty()) {
           throw new AxelorException(
               TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
               I18n.get(IExceptionMessage.PURCHASE_REQUEST_MISSING_SUPPLIER_USER),
               purchaseRequestSeqs.toString());
-        }
+        }*/
         response.setCanClose(true);
         List<PurchaseOrder> purchaseOrderList =
-            Beans.get(PurchaseRequestService.class)
-                .generatePo(purchaseRequests, groupBySupplier, groupByProduct);
+            Beans.get(PurchaseRequestService.class).generatePo(purchaseRequests);
         ActionViewBuilder actionViewBuilder =
             ActionView.define(
                     String.format(

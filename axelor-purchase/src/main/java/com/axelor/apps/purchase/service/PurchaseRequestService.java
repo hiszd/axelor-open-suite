@@ -28,7 +28,6 @@ public interface PurchaseRequestService {
 
   public void acceptRequest(List<PurchaseRequest> purchaseRequests);
 
-  public List<PurchaseOrder> generatePo(
-      List<PurchaseRequest> purchaseRequests, Boolean groupBySupplier, Boolean groupByProduct)
+  public List<PurchaseOrder> generatePo(List<PurchaseRequest> purchaseRequests)
       throws AxelorException;
 }

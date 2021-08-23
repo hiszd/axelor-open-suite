@@ -7,11 +7,17 @@
    
    <entity name="PurchaseRequestLine" lang="java">
 	   <many-to-one name="product" ref="com.axelor.apps.base.db.Product" title="Product"/>
+	   <many-to-one name="supplierUser" ref="com.axelor.apps.base.db.Partner" title="Supplier" />
 	   <boolean name="newProduct" title="New product" />
 	   <many-to-one name="unit" ref="com.axelor.apps.base.db.Unit" title="Unit" />
        <decimal name="quantity" title="Quantity" precision="20" scale="10" min="0"/>
        <string name="productTitle" title="Product"/>
        <many-to-one name="purchaseRequest" ref="com.axelor.apps.purchase.db.PurchaseRequest" title="Purchase request"/>
+       
+       <track>
+           <field name="supplierUser"/>
+       </track>
+		
    </entity>
 
 </domain-models>

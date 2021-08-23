@@ -17,8 +17,10 @@
  */
 package com.axelor.apps.supplychain.service;
 
+import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseRequest;
+import com.axelor.apps.purchase.db.PurchaseRequestLine;
 import com.axelor.apps.purchase.service.PurchaseRequestServiceImpl;
 import com.axelor.apps.stock.db.StockLocation;
 import com.axelor.apps.stock.db.repo.StockLocationRepository;
@@ -32,10 +34,10 @@ public class PurchaseRequestServiceSupplychainImpl extends PurchaseRequestServic
   @Inject StockLocationRepository stockLocationRepo;
 
   @Override
-  protected PurchaseOrder createPurchaseOrder(PurchaseRequest purchaseRequest)
+  protected PurchaseOrder createPurchaseOrder(PurchaseRequest purchaseRequest, Partner supplierUser)
       throws AxelorException {
 
-    PurchaseOrder purchaseOrder = super.createPurchaseOrder(purchaseRequest);
+    PurchaseOrder purchaseOrder = super.createPurchaseOrder(purchaseRequest, supplierUser);
 
     if (Beans.get(AppSupplychainService.class).isApp("supplychain")) {
       purchaseOrder.setStockLocation(purchaseRequest.getStockLocation());
@@ -44,14 +46,14 @@ public class PurchaseRequestServiceSupplychainImpl extends PurchaseRequestServic
   }
 
   @Override
-  protected String getPurchaseOrderGroupBySupplierKey(PurchaseRequest purchaseRequest) {
-    String key = super.getPurchaseOrderGroupBySupplierKey(purchaseRequest);
+  protected String getPurchaseOrderGroupBySupplierKey(PurchaseRequestLine purchaseRequestLine) {
+    String key = super.getPurchaseOrderGroupBySupplierKey(purchaseRequestLine);
 
     if (!Beans.get(AppSupplychainService.class).isApp("supplychain")) {
       return key;
     }
 
-    StockLocation stockLocation = purchaseRequest.getStockLocation();
+    StockLocation stockLocation = purchaseRequestLine.getPurchaseRequest().getStockLocation();
     if (stockLocation != null) {
       key = key + "_" + stockLocation.getId().toString();
     }

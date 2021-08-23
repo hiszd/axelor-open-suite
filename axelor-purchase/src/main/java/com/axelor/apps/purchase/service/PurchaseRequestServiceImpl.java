@@ -17,6 +17,7 @@
  */
 package com.axelor.apps.purchase.service;
 
+import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.purchase.db.PurchaseOrder;
@@ -73,17 +74,62 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
 
   @Transactional(rollbackOn = {Exception.class})
   @Override
-  public List<PurchaseOrder> generatePo(
-      List<PurchaseRequest> purchaseRequests, Boolean groupBySupplier, Boolean groupByProduct)
+  public List<PurchaseOrder> generatePo(List<PurchaseRequest> purchaseRequests)
       throws AxelorException {
 
     List<PurchaseOrderLine> purchaseOrderLineList = new ArrayList<PurchaseOrderLine>();
     Map<String, PurchaseOrder> purchaseOrderMap = new HashMap<>();
 
     for (PurchaseRequest purchaseRequest : purchaseRequests) {
-      PurchaseOrder purchaseOrder;
+      // Added chunk for new setup
+      Map<Object, List<PurchaseRequestLine>> lines =
+          purchaseRequest.getPurchaseRequestLineList().stream()
+              .collect(Collectors.groupingBy(e -> e.getSupplierUser()));
+      for (Map.Entry<Object, List<PurchaseRequestLine>> group : lines.entrySet()) {
+        List<PurchaseOrder> purchaseOrderList = new ArrayList<PurchaseOrder>();
+        PurchaseOrder po = new PurchaseOrder();
+        for (PurchaseRequestLine entry : group.getValue()) {
+          String key = true ? getPurchaseOrderGroupBySupplierKey(entry) : null;
+          if (key != null && purchaseOrderMap.containsKey(key)) {
+            po = purchaseOrderMap.get(key);
+            purchaseOrderList.add(po);
+          } else {
+            po = createPurchaseOrder(purchaseRequest, entry.getSupplierUser());
+            purchaseOrderList.add(po);
+            key = key == null ? purchaseRequest.getId().toString() : key;
+            purchaseOrderMap.put(key, po);
+          }
 
-      String key = groupBySupplier ? getPurchaseOrderGroupBySupplierKey(purchaseRequest) : null;
+          if (po == null) {
+            po = createPurchaseOrder(purchaseRequest, entry.getSupplierUser());
+          }
+
+          PurchaseOrderLine purchaseOrderLine = new PurchaseOrderLine();
+          Product product = entry.getProduct();
+
+          purchaseOrderLine = po != null ? getPoLineByProduct(product, po) : null;
+
+          purchaseOrderLine =
+              purchaseOrderLineService.createPurchaseOrderLine(
+                  po,
+                  product,
+                  entry.getNewProduct() ? entry.getProductTitle() : product.getName(),
+                  entry.getNewProduct() ? null : product.getDescription(),
+                  entry.getQuantity(),
+                  entry.getUnit());
+          po.addPurchaseOrderLineListItem(purchaseOrderLine);
+          purchaseOrderLineList.add(purchaseOrderLine);
+          purchaseOrderLineService.compute(purchaseOrderLine, po);
+        }
+
+        po.getPurchaseOrderLineList().addAll(purchaseOrderLineList);
+        purchaseOrderService.computePurchaseOrder(po);
+        purchaseOrderRepo.save(po);
+        purchaseRequest.setPurchaseOrderList(purchaseOrderList);
+        purchaseRequestRepo.save(purchaseRequest);
+      }
+
+      /*String key = true ? getPurchaseOrderGroupBySupplierKey(purchaseRequest) : null;
       if (key != null && purchaseOrderMap.containsKey(key)) {
         purchaseOrder = purchaseOrderMap.get(key);
       } else {
@@ -101,7 +147,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         Product product = purchaseRequestLine.getProduct();
 
         purchaseOrderLine =
-            groupByProduct && purchaseOrder != null
+            purchaseOrder != null
                 ? getPoLineByProduct(product, purchaseOrder)
                 : null;
 
@@ -123,7 +169,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
       purchaseOrderService.computePurchaseOrder(purchaseOrder);
       purchaseOrderRepo.save(purchaseOrder);
       purchaseRequest.setPurchaseOrder(purchaseOrder);
-      purchaseRequestRepo.save(purchaseRequest);
+      purchaseRequestRepo.save(purchaseRequest);*/
     }
     List<PurchaseOrder> purchaseOrders =
         purchaseOrderMap.values().stream().collect(Collectors.toList());
@@ -143,24 +189,24 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
     return purchaseOrderLine;
   }
 
-  protected PurchaseOrder createPurchaseOrder(PurchaseRequest purchaseRequest)
+  protected PurchaseOrder createPurchaseOrder(PurchaseRequest purchaseRequest, Partner supplierUser)
       throws AxelorException {
     return purchaseOrderRepo.save(
         purchaseOrderService.createPurchaseOrder(
             AuthUtils.getUser(),
             purchaseRequest.getCompany(),
             null,
-            purchaseRequest.getSupplierUser().getCurrency(),
+            supplierUser.getCurrency(),
             null,
             null,
             null,
             appBaseService.getTodayDate(purchaseRequest.getCompany()),
             null,
-            purchaseRequest.getSupplierUser(),
+            supplierUser,
             null));
   }
 
-  protected String getPurchaseOrderGroupBySupplierKey(PurchaseRequest purchaseRequest) {
-    return purchaseRequest.getSupplierUser().getId().toString();
+  protected String getPurchaseOrderGroupBySupplierKey(PurchaseRequestLine purchaseRequestLine) {
+    return purchaseRequestLine.getSupplierUser().getId().toString();
   }
 }
